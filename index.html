@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>郭专家问诊服务</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .expert-card {
+            background: #f8fbff;
+            border: 2px solid #e8f4ff;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(7,193,96,0.1);
+            transition: transform 0.3s ease;
+        }
+        .invalid {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.25rem rgba(220,53,69,.25) !important;
+        }
+        .urgent-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 1000;
+        }
+        .sending-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+    <script>
+        (function loadSDK() {
+            const sources = [
+                'https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js',
+                'https://lf3-cdn-tos.bytecdntp.com/cdn/emailjs/browser/4.4.1/email.min.js',
+                '/libs/emailjs-4.4.1.min.js'
+            ];
+            let currentSource = 0;
+            const loadNext = () => {
+                if (currentSource >= sources.length) return;
+                const script = document.createElement('script');
+                script.src = sources[currentSource] + '?v=' + Date.now();
+                script.onload = () => {
+                    emailjs.init({
+                        publicKey: 'odtHIsCrX0LIe8v3G',
+                        blockHeadless: true,
+                        limitRate: { throttle: 5000 }
+                    });
+                };
+                script.onerror = () => {
+                    currentSource++;
+                    loadNext();
+                };
+                document.head.appendChild(script);
+            };
+            if (typeof emailjs === 'undefined') loadNext();
+        })();
+
+        function initDateTimePicker() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('appointmentTime').min = `${year}-${month}-${day}T${hours}:${minutes}`;
+            document.getElementById('appointmentTime').max = `${year + 1}-${month}-${day}T23:59`;
+            document.getElementById('appointmentTime').step = 900;
+        }
+        window.onload = initDateTimePicker;
+    </script>
+</head>
+<body class="bg-light">
+    <div class="sending-overlay">
+        <div class="spinner-border text-primary"></div>
+    </div>
+
+    <div class="container py-5">
+        <div class="expert-card p-4 mb-5">
+            <div class="text-center">
+                <h2 class="mb-4">郭 · 副主任医师</h2>
+                <div class="d-flex gap-2 mb-3 justify-content-center">
+                    <span class="badge bg-primary">12年三甲医院经验</span>
+                    <span class="badge bg-danger">国际急救认证</span>
+                    <span class="badge bg-warning">心理咨询师二级</span>
+                </div>
+                <ul class="list-unstyled">
+                    <li class="mb-2">✅ 覆盖 邵逸夫 | 浙一 | 省妇保等三甲医院</li>
+                    <li class="mb-2">✅ 精通 术后 | 儿童 | 孕妇 | 老年 疑难杂症</li>
+                    <li>✅ 累计 完成服务1526人次 | 好评率100%</li>
+                </ul>
+                <div class="badge bg-success mt-3">卫健委认证编号：201132001856</div>
+            </div>
+        </div>
+
+        <form id="bookingForm" class="bg-white p-4 rounded-3 shadow-sm">
+            <h4 class="mb-4">📝 服务预约登记表</h4>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">收件邮箱</label>
+                    <input type="email" class="form-control" id="toEmail" placeholder="请输入接收确认邮件的邮箱" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">就诊人姓名</label>
+                    <input type="text" class="form-control" id="patientName" placeholder="需与身份证一致" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">联系方式</label>
+                    <div class="input-group">
+                        <span class="input-group-text">+86</span>
+                        <input type="tel" class="form-control" id="phone" placeholder="请输入11位手机号" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">预约时间</label>
+                    <input type="datetime-local" class="form-control" id="appointmentTime" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">服务类型</label>
+                    <select class="form-select" id="serviceType" required>
+                        <option value="">请选择服务类型</option>
+                        <option>远程问诊 10元/次</option>
+                        <option>到户问诊 100元/次</option>
+                        <option>推拿 200元/小时</option>
+                        <option>针灸 300元/次</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-4">
+                <i class="bi bi-shield-check me-2"></i>
+            ※ 服务时段：08:00-20:00（全年无休）
+            </div>
+
+            <button type="button" class="btn btn-success w-100 py-3" onclick="sendAppointmentEmail()">
+                📮 立即提交预约
+            </button>
+        </form>
+
+        <div class="urgent-modal" id="urgentModal" onclick="hideUrgent()">
+            <div class="urgent-container" onclick="event.stopPropagation()">
+                <h5 class="text-center mb-4">微信加急服务通道</h5>
+                <div class="text-center">
+                    <p class="text-danger mb-3">※ 加急服务费用：原价基础上+20%</p>
+                    <div class="alert alert-warning">
+                        <p class="mb-2">请按以下步骤操作：</p>
+                        <ol class="text-start">
+                            <li>打开微信</li>
+                            <li>点击右上角"+"号</li>
+                            <li>选择"添加朋友"</li>
+                            <li>搜索微信号：</li>
+                        </ol>
+                        <div class="wechat-id mt-3">marvinguoo</div>
+                    </div>
+                    <p class="text-muted small mt-3">添加时备注：加急+手机号</p>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-danger urgent-btn" onclick="showUrgent()">
+            ⚡ 加急预约通道（+20%费用）
+        </button>
+    </div>
+
+    <script>
+        const EMAILJS_CONFIG = {
+            SERVICE_ID: 'service_j5m3ouc',
+            TEMPLATE_ID: 'template_55q4df8'
+        };
+
+        function validateForm() {
+            const fields = [
+                { id: 'toEmail', regex: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/ },
+                { id: 'patientName', regex: /^[\u4e00-\u9fa5]{2,10}$/ },
+                { id: 'phone', regex: /^1[3-9]\d{9}$/ },
+                { id: 'serviceType', regex: /.+/ },
+                { id: 'appointmentTime', regex: /.+/ }
+            ];
+
+            let isValid = true;
+            fields.forEach(field => {
+                const element = document.getElementById(field.id);
+                const isValidField = field.regex.test(element.value.trim());
+                element.classList.toggle('invalid', !isValidField);
+                element.addEventListener('input', () => element.classList.remove('invalid'));
+                if (!isValidField) isValid = false;
+            });
+            return isValid;
+        }
+
+        async function sendAppointmentEmail() {
+            if (!validateForm()) {
+                const appointmentTime = document.getElementById('appointmentTime');
+                if (!appointmentTime.value.trim()) {
+                    showNotice('请选择预约时间', 'warning');
+                    appointmentTime.classList.add('invalid');
+                } else {
+                    showNotice('请正确填写所有字段', 'warning');
+                }
+                return;
+            }
+
+            const appointmentDate = new Date(document.getElementById('appointmentTime').value);
+            const formattedTime = appointmentDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(/\//g, '-');
+
+            const mailContent = `【预约申请】
+患者姓名：${document.getElementById('patientName').value.trim()}
+联系电话：${document.getElementById('phone').value.trim()}
+服务类型：${document.getElementById('serviceType').value}
+预约时间：${formattedTime}
+
+提交时间：${new Date().toLocaleString()}`;
+
+            const formData = {
+                to_email: document.getElementById('toEmail').value.trim(),
+                message: mailContent,
+                headers: { 'User-Agent': 'Mozilla/5.0 (Mobile; rv:126.0) Gecko/20100101 Firefox/126.0' }
+            };
+
+            try {
+                document.querySelector('.sending-overlay').style.display = 'flex';
+                await emailjs.send(
+                    EMAILJS_CONFIG.SERVICE_ID,
+                    EMAILJS_CONFIG.TEMPLATE_ID,
+                    formData
+                );
+                showNotice('预约信息已发送至指定邮箱', 'success');
+                document.getElementById('bookingForm').reset();
+            } catch (error) {
+                showNotice(`邮件发送失败：${error.text || '服务异常'}`, 'danger');
+            } finally {
+                document.querySelector('.sending-overlay').style.display = 'none';
+            }
+        }
+
+        function showNotice(msg, type) {
+            const notice = document.createElement('div');
+            notice.className = `alert alert-${type} position-fixed`;
+            notice.style.cssText = 'bottom:20px; right:20px; z-index:9999;';
+            notice.textContent = msg;
+            document.body.appendChild(notice);
+            setTimeout(() => notice.remove(), 3000);
+        }
+
+        function showUrgent() {
+            document.getElementById('urgentModal').style.display = 'block';
+        }
+
+        function hideUrgent() {
+            document.getElementById('urgentModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
